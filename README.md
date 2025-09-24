@@ -40,7 +40,7 @@ python3 Calculadora.py gramatica.txt "2+3*4"
 
 Al ejecutarlo con una expresión válida se vera en la salida: `Cadena valida. arbol de sintaxis generado.` y se guardará un archivo `arbol_sintactico.png` con la representación del árbol.
 
-
+[Imagen1](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Imagenes/1.png)
 
 Si la expresión no respeta la gramática, la salida será `Cadena invalida.`. Por ejemplo:
 
