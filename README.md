@@ -1,16 +1,16 @@
-# Calculadora sintáctica (generador de árbol)
+# Arbol Sintactico
 
-Este repositorio contiene un pequeño analizador sintáctico (parser) para expresiones aritméticas y una gramática en formato texto utilizada por el programa. El objetivo es validar expresiones como `2+3*4` y generar un árbol sintáctico en formato de imagen (`arbol_sintactico.png`). El proyecto fue pensado para ejecutarse desde la terminal en un entorno Ubuntu y utiliza Python 3 junto con las librerías `networkx` y `matplotlib` para construir y dibujar el árbol.
+Este repositorio contiene un pequeño analizador sintáctico (parser) para expresiones aritméticas y una gramática en formato texto utilizada por el programa. El objetivo es validar expresiones como `2+3*4` y generar un árbol sintáctico en formato de imagen . El proyecto fue pensado para ejecutarse desde la terminal en un entorno Ubuntu y utiliza Python junto con las librerías `networkx` y `matplotlib` para construir y dibujar el árbol.
 
 ## Requisitos y dependencias
 
-El programa está escrito en Python 3 y no necesita una instalación compleja. Para ejecutar el código necesitarás tener Python 3 y `pip` disponibles. El resto de dependencias se instalan con `pip`. Se recomienda usar un entorno virtual (`venv`) para aislar las dependencias del sistema.
+El programa está escrito en Python y no se necesita una instalación demasiado compleja. Para ejecutar el código se necesitara tener Python3 y `pip` disponibles. El resto de dependencias se instalan con `pip`. Se recomienda usar un entorno virtual (`venv`) para aislar las dependencias del sistema y que el que el ejecutable no genere algun problema. 
 
-A continuación explico cómo preparar un entorno limpio en Ubuntu y las dependencias exactas que se usan.
+A continuación se explica cómo preparar un entorno limpio en Ubuntu y las dependencias exactas que se usan.
 
-## Instalación en Ubuntu (pasos recomendados)
+## Instalación en Ubuntu 
 
-Primero, actualiza la lista de paquetes e instala Python 3 y `pip` si no los tienes. Después crea y activa un entorno virtual para el proyecto y finalmente instala las librerías necesarias con `pip`.
+Primero, se debe de actualizar la lista de paquetes e instalar Python3 y `pip` si no se tienen. Despues debe de crear y activar un entorno virtual.Finalmente se debe de instalar las librerias necesarias con `pip`.
 
 ```
 sudo apt update && sudo apt upgrade -y
@@ -20,32 +20,37 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install networkx matplotlib
 ```
-
-Si vas a ejecutar el script en un servidor sin interfaz gráfica (headless) y tienes problemas con el backend de Matplotlib al guardar la imagen, puedes forzar el backend no interactivo antes de ejecutar el programa con `export MPLBACKEND=Agg` o añadirlo en el entorno virtual.
+Con estos comandos debe de ser suficiente para instalar todo para ejecutar el codigo y guardar en formato PNG el arbol sintactico. 
 
 ## Archivos principales
 
-El programa principal se llama `Calculadora.py` y la gramática usada por defecto se guarda en `gramatica.txt`. El script carga la gramática, tokeniza la expresión que le pases por línea de comandos, construye un árbol sintáctico (si la expresión es válida) y guarda una imagen llamada `arbol_sintactico.png` en el directorio desde donde se ejecutó. Asegúrate de que el archivo de gramática esté en el mismo directorio o indica su ruta completa al invocar el script.
+El programa principal se llama [Calculadora.py](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Arbol%20Sintactico/Calculadora.py) y la gramática usada por defecto se guarda en [gramatica.txt](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Arbol%20Sintactico/gramatica.txt). El script carga la gramática, tokeniza la expresión que se le pase por línea de comandos, construye un árbol sintáctico (si la expresión es válida) y guarda una imagen llamada `arbol_sintactico.png` en el directorio desde donde se ejecutó. Asegurarse de que el archivo de gramática esté en el mismo directorio que el script. 
 
 ## Formato de la gramática
 
-La gramática se almacena en texto plano con producciones del tipo `A -> B C | D`. Cada línea que contenga `->` es interpretada como una regla. Los símbolos terminales que el analizador reconoce por token son `num` para números, operadores `+ - * /` (mappeados en tokens `opsuma` y `opmul`) y paréntesis `(` `)` (mappeados como `pari` y `pard`). Puedes modificar `gramatica.txt` para experimentar con otras reglas siempre que respetes el formato `izquierda -> derecha` por línea.
+La gramática se almacena en texto plano con producciones del tipo `A -> B C | D`. Cada línea que contenga `->` es interpretada como una regla. Los símbolos terminales que el analizador reconoce por token son `num` para números, operadores `+ - * /` (en tokens aparece como: `opsuma` y `opmul`) y paréntesis `(` `)` (como `pari` y `pard`). 
 
 ## Uso desde terminal (ejemplos)
 
-Para ejecutar el programa, sitúate en el directorio que contiene `Calculadora.py` y `gramatica.txt` y ejecuta el comando con Python 3. A continuación hay ejemplos concretos que puedes copiar y pegar en tu terminal. El primer ejemplo usa una expresión válida; el segundo muestra el comportamiento con una cadena inválida.
+Para ejecutar el programa, ubique el directorio que contiene `Calculadora.py` y `gramatica.txt` y ejecute el comando con Python3. A continuación hay ejemplos concretos que puede copiar y pegar. El primer ejemplo usa una expresión válida; el segundo muestra el comportamiento con una cadena inválida.
 
 ```
 python3 Calculadora.py gramatica.txt "2+3*4"
 ```
 
-Al ejecutarlo con una expresión válida verás en la salida: `Cadena valida. arbol de sintaxis generado.` y se guardará un archivo `arbol_sintactico.png` con la representación del árbol. Si la expresión no respeta la gramática, la salida será `Cadena invalida.`. Por ejemplo:
+Al ejecutarlo con una expresión válida se vera en la salida: `Cadena valida. arbol de sintaxis generado.` y se guardará un archivo `arbol_sintactico.png` con la representación del árbol.
+
+
+
+Si la expresión no respeta la gramática, la salida será `Cadena invalida.`. Por ejemplo:
 
 ```
 python3 Calculadora.py gramatica.txt "2++3"
 ```
 
-Este último comando normalmente imprimirá `Cadena invalida.` porque la tokenización y el análisis detectan el error sintáctico.
+Este último comando normalmente imprimirá `Cadena invalida.` porque la tokenización y el análisis detectan el error sintáctico. Como se muestra a continuacion: 
+
+
 
 ## Detalles de ejecución y comportamiento
 
