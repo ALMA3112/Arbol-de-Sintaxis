@@ -40,7 +40,7 @@ python3 Calculadora.py gramatica.txt "2+3*4"
 
 Al ejecutarlo con una expresión válida se vera en la salida: `Cadena valida. arbol de sintaxis generado.` y se guardará un archivo `arbol_sintactico.png` con la representación del árbol.
 
-[Imagen1](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Imagenes/1.png)
+![](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Imagenes/1.png)
 
 Si la expresión no respeta la gramática, la salida será `Cadena invalida.`. Por ejemplo:
 
@@ -50,24 +50,36 @@ python3 Calculadora.py gramatica.txt "2++3"
 
 Este último comando normalmente imprimirá `Cadena invalida.` porque la tokenización y el análisis detectan el error sintáctico. Como se muestra a continuacion: 
 
-
+![](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Imagenes/2.png)
 
 ## Detalles de ejecución y comportamiento
 
-El script realiza los siguientes pasos cuando lo invocas: carga la gramática desde el archivo de texto, convierte la cadena de entrada en tokens (`num`, `opsuma`, `opmul`, `pari`, `pard`), intenta analizarla aplicando las reglas recursivas para `E`, `T` y `F`, y si el análisis termina correctamente genera y normaliza un árbol sintáctico. La imagen final del árbol se genera con NetworkX y Matplotlib y se guarda como `arbol_sintactico.png`.
+El script realiza los siguientes pasos cuando se le invoca: carga la gramática desde el archivo de texto, convierte la cadena de entrada en tokens (`num`, `opsuma`, `opmul`, `pari`, `pard`), intenta analizar aplicando las reglas recursivas para `E`, `T` y `F`, y si el análisis termina correctamente genera y normaliza un árbol sintáctico. La imagen final del árbol se genera con NetworkX y Matplotlib y se guarda como `arbol_sintactico.png`.
 
-Si trabajas en un entorno en el que Matplotlib no puede abrir una ventana gráfica, esto no impide que se guarde la imagen; sin embargo, en algunos entornos puede ser necesario forzar un backend no interactivo (ver la sección de instalación).
+## Ejemplos de prueba 
 
-## Ejemplos de prueba adicionales
+Se puede probar expresiones con paréntesis y con combinaciones de operadores para verificar la precedencia y la construcción del árbol. Por ejemplo, `"(1+2)*3"`, `"4/2+6"` y `"7+3*1"` son buenos candidatos para validar distintos caminos de parseo y ver cómo el árbol refleja la estructura sintáctica.
 
-Puedes probar expresiones con paréntesis y con combinaciones de operadores para verificar la precedencia y la construcción del árbol. Por ejemplo, `"(1+2)*3"`, `"4/2+6"` y `"7-(3+1)"` son buenos candidatos para validar distintos caminos de parseo y ver cómo el árbol refleja la estructura sintáctica.
+- Cadena `(1+2)*3:`
+  
+    ![](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Imagenes/3.png)
+
+    En la imagen se evidencia como el codigo del arbol sintactico respeta las reglas de produccion de la gramatica y el orden de precedencia de la misma. Evaluando lo que esta dentro de los parentesis (que es lo ultimo que se genera en el arbol) y despues la multiplicacion. Ademas de que el arbol genera de izquierda a derecha como de derecha a izquierda. Esto se debe a los parentesis. Su funcion principal es `E -> E opsuma T`, entonces toma esta y hace el arbol a partir de esta expresion, peor como debe iniciar el arbol con la multiplicacion lo que hace es utilizar `E -> T` y `T -> T opmul F` para hacer de forma correcta el arbol de sintaxis. 
+
+
+- Cadena `4/2+6:`
+
+    ![](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Imagenes/4.png)
+
+    Esta arbol de igual forma respeta las reglas de la gramatica y funciona de la misma forma esto se debe a la division que se presenta. Su funcion principal es `E -> E opsuma T`, entonces toma esta y hace el arbol a partir de esta expresion.
+
+
+- Cadena `7+3*1:`
+
+    ![](https://github.com/ALMA3112/Arbol-de-Sintaxis/blob/main/Imagenes/5.png)
+
+    Este arbol muestra una diferencia a los de arriba, el hace el arbol de izquierda a derecha esto se debe a como esta escrita la gramatica, ya que su funcion principal es `E -> E opsuma T`, entonces toma esta y hace el arbol a partir de esta expresion. 
 
 ## Solución de problemas comunes
 
-Si obtienes un mensaje de error relacionado con símbolos no reconocidos, revisa que la expresión de entrada contenga únicamente dígitos, espacios, operadores `+ - * /` y paréntesis. Si Matplotlib falla al intentar dibujar, verifica que has instalado la dependencia correctamente y, si es un servidor sin entorno gráfico, exporta `MPLBACKEND=Agg` antes de ejecutar el script.
-
-Si necesitas que el script acepte identificadores (tokens `id`) u otros terminales distintos, puedes ampliar la función de tokenización en `Calculadora.py` y actualizar la gramática en `gramatica.txt` acorde a las nuevas reglas.
-
-## Licencia y notas finales
-
-Este proyecto es un ejemplo didáctico para mostrar un análisis sintáctico básico y la generación de un árbol. Si quieres que lo adapte para soportar más tokens, salida en formatos distintos (SVG, DOT) o integración con Graphviz, dímelo y lo preparo.
+Si se obtiene un mensaje de error relacionado con símbolos no reconocidos, revise que la expresión de entrada contenga únicamente dígitos, espacios, operadores `+ - * /` y paréntesis. Si Matplotlib falla al intentar dibujar, verifique la instalacion de la dependencia este correctamente. 
