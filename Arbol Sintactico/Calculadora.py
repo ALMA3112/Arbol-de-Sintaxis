@@ -1,345 +1,229 @@
-import re
+import sys
+import networkx as nx
+import matplotlib.pyplot as plt
 
-TOK_NUM = "NUM"        
-TOK_ID  = "ID"         
-TOK_MAS = "MAS"        
-TOK_MENOS = "MENOS"    
-TOK_POR = "POR"        
-TOK_DIV = "DIV"        
-TOK_PAR_IZQ = "PAR_IZQ" 
-TOK_PAR_DER = "PAR_DER" 
-TOK_EOF = "EOF"        # fin de la entrada
+def cargar_gramatica(ruta):
+    gramatica = {}
+    with open(ruta, "r") as f:
+        for linea in f:
+            if "->" in linea:
+                izq, der = linea.strip().split("->")
+                izq = " ".join(izq.split())
+                producciones = [p.strip().split() for p in der.split("|")]
+                if izq not in gramatica:
+                    gramatica[izq] = []
+                gramatica[izq].extend(producciones)
+    return gramatica
 
-patrones = [
-    (TOK_NUM,      r'\d+(\.\d+)?'),         
-    (TOK_ID,       r'[A-Za-z_][A-Za-z0-9_]*'), 
-    (TOK_MAS,      r'\+'),
-    (TOK_MENOS,    r'-'),
-    (TOK_POR,      r'\*'),
-    (TOK_DIV,      r'/'),
-    (TOK_PAR_IZQ,  r'\('),
-    (TOK_PAR_DER,  r'\)'),
-    ('ESPACIO',    r'[ \t]+'),             
-    ('OTRO',       r'.'),                  
-]
-
-regex_tokens = '|'.join('(?P<%s>%s)' % p for p in patrones)
-matcher = re.compile(regex_tokens).match
-
-# guarda el tipo y valor
-class Token:
-    def __init__(self, tipo, valor=None):
-        self.tipo = tipo
-        self.valor = valor
-    def __repr__(self):
-        return f"Token({self.tipo}, {self.valor})"
-
-# Separa en tokens
-def lexear(texto):
-    pos = 0
-    m = matcher(texto, pos)
-    while m:
-        nombre = m.lastgroup
-        val = m.group(nombre)
-        if nombre == TOK_NUM:
-            yield Token(TOK_NUM, float(val))
-        elif nombre == TOK_ID:
-            yield Token(TOK_ID, val)
-        elif nombre == TOK_MAS:
-            yield Token(TOK_MAS, val)
-        elif nombre == TOK_MENOS:
-            yield Token(TOK_MENOS, val)
-        elif nombre == TOK_POR:
-            yield Token(TOK_POR, val)
-        elif nombre == TOK_DIV:
-            yield Token(TOK_DIV, val)
-        elif nombre == TOK_PAR_IZQ:
-            yield Token(TOK_PAR_IZQ, val)
-        elif nombre == TOK_PAR_DER:
-            yield Token(TOK_PAR_DER, val)
-        elif nombre == 'ESPACIO':
-            pass
+def tokenizar(expr):
+    tokens = []
+    numero = ""
+    for ch in expr:
+        if ch.isdigit():
+            numero += ch
         else:
-            raise SyntaxError(f"Caracter invalido: {val!r}")
-        pos = m.end()
-        m = matcher(texto, pos) 
-    yield Token(TOK_EOF, None)
+            if numero:
+                tokens.append(("num", numero))
+                numero = ""
+            if ch == "+":
+                tokens.append(("opsuma", "+"))
+            elif ch == "-":
+                tokens.append(("opsuma", "-"))
+            elif ch == "*":
+                tokens.append(("opmul", "*"))
+            elif ch == "/":
+                tokens.append(("opmul", "/"))
+            elif ch == "(":
+                tokens.append(("pari", "("))
+            elif ch == ")":
+                tokens.append(("pard", ")"))
+            elif ch.strip() == "":
+                continue
+            else:
+                print(f"Error: simbolo no reconocido '{ch}'")
+                sys.exit(1)
+    if numero:
+        tokens.append(("num", numero))
+    return tokens
 
 class Nodo:
-    def __init__(self, etiqueta, hijos=None, valor=None, prod=None):
-        # etiqueta: E, T, F, num, id, opsuma, opmul, etc.
-        self.etiqueta = etiqueta
-        self.hijos = hijos if hijos is not None else []
-        self.valor = valor  
-        self.prod = prod    
-    def __repr__(self):
-        if self.valor is not None:
-            return f"{self.etiqueta}({self.valor})"
-        return f"{self.etiqueta}"
-
-class Parser:
-    def __init__(self, lista_tokens):
-        self.iterator = iter(lista_tokens) 
-        self.actual = None                 
-        self._avanzar()                   
-
-    def _avanzar(self):
-        self.actual = next(self.iterator)
-
-    def _comer(self, tipo_esperado):
-        if self.actual.tipo == tipo_esperado:
-            t = self.actual
-            self._avanzar()
-            return t
-        raise SyntaxError(f"Se esperaba {tipo_esperado} pero vino {self.actual.tipo}")
-
-    # E -> E opsuma T | T
-    def parse_E(self):
-        izquierda = self.parse_T()
-        if self.actual.tipo in (TOK_MAS, TOK_MENOS):
-            while self.actual.tipo in (TOK_MAS, TOK_MENOS):
-                if izquierda.etiqueta != 'E':
-                    izquierda = Nodo('E', hijos=[izquierda], prod="E -> T")
-                if self.actual.tipo == TOK_MAS:
-                    self._comer(TOK_MAS)
-                    operador = Nodo('opsuma', valor='+', prod="opsuma -> +")
-                else:
-                    self._comer(TOK_MENOS)
-                    operador = Nodo('opsuma', valor='-', prod="opsuma -> -")
-                derecha = self.parse_T()
-                izquierda = Nodo('E', hijos=[izquierda, operador, derecha], prod="E -> E opsuma T")
-            return izquierda
-        else:
-            return Nodo('E', hijos=[izquierda], prod="E -> T")
-
-    # T -> T opmul F | F
-    def parse_T(self):
-        izquierda = self.parse_F()
-        if self.actual.tipo in (TOK_POR, TOK_DIV):
-            while self.actual.tipo in (TOK_POR, TOK_DIV):
-                if izquierda.etiqueta != 'T':
-                    izquierda = Nodo('T', hijos=[izquierda], prod="T -> F")
-                if self.actual.tipo == TOK_POR:
-                    self._comer(TOK_POR)
-                    operador = Nodo('opmul', valor='*', prod="opmul -> *")
-                else:
-                    self._comer(TOK_DIV)
-                    operador = Nodo('opmul', valor='/', prod="opmul -> /")
-                derecha = self.parse_F()
-                izquierda = Nodo('T', hijos=[izquierda, operador, derecha], prod="T -> T opmul F")
-            return izquierda
-        else:
-            return Nodo('T', hijos=[izquierda], prod="T -> F")
-
-    # F -> id | num | ( E )
-    def parse_F(self):
-        if self.actual.tipo == TOK_ID:
-            t = self._comer(TOK_ID)
-            nodo_id = Nodo('id', valor=t.valor)
-            return Nodo('F', hijos=[nodo_id])
-        elif self.actual.tipo == TOK_NUM:
-            t = self._comer(TOK_NUM)
-            nodo_num = Nodo('num', valor=t.valor)
-            return Nodo('F', hijos=[nodo_num])
-        elif self.actual.tipo == TOK_PAR_IZQ:
-            self._comer(TOK_PAR_IZQ)
-            nodo_pari = Nodo('pari', valor='(')
-            inner = self.parse_E()
-            self._comer(TOK_PAR_DER)
-            nodo_pard = Nodo('pard', valor=')')
-            return Nodo('F', hijos=[nodo_pari, inner, nodo_pard])
-        else:
-            raise SyntaxError(f"Token inesperado en F: {self.actual}")
-
-    def parse(self):
-        raiz = self.parse_E()
-        if self.actual.tipo != TOK_EOF:
-            raise SyntaxError("Quedó texto sin parsear")
-        return raiz
-
-def evaluar(nodo, valores_id):
-    if nodo.etiqueta == 'E':
-        if len(nodo.hijos) == 1:
-            return evaluar(nodo.hijos[0], valores_id)
-        a = evaluar(nodo.hijos[0], valores_id)
-        op = nodo.hijos[1]
-        b = evaluar(nodo.hijos[2], valores_id)
-        if op.valor == '+':
-            return a + b
-        else:
-            return a - b
-    if nodo.etiqueta == 'T':
-        if len(nodo.hijos) == 1:
-            return evaluar(nodo.hijos[0], valores_id)
-        a = evaluar(nodo.hijos[0], valores_id)
-        op = nodo.hijos[1]
-        b = evaluar(nodo.hijos[2], valores_id)
-        if op.valor == '*':
-            return a * b
-        else:
-            if b == 0:
-                raise ZeroDivisionError("División por cero")
-            return a / b
-    if nodo.etiqueta == 'F':
-        if len(nodo.hijos) == 1:
-            hijo = nodo.hijos[0]
-            if hijo.etiqueta == 'num':
-                return float(hijo.valor)
-            if hijo.etiqueta == 'id':
-                nombre = hijo.valor
-                if nombre not in valores_id:
-                    entrada = input(f"Ingresa valor para {nombre}: ")
-                    valores_id[nombre] = float(entrada)
-                return float(valores_id[nombre])
-            return evaluar(hijo, valores_id)
-        else:
-            return evaluar(nodo.hijos[1], valores_id)
-    if nodo.etiqueta == 'num':
-        return float(nodo.valor)
-    if nodo.etiqueta == 'id':
-        nombre = nodo.valor
-        if nombre not in valores_id:
-            entrada = input(f"Ingresa valor para {nombre}: ")
-            valores_id[nombre] = float(entrada)
-        return float(valores_id[nombre])
-    raise RuntimeError(f"Etiqueta desconocida: {nodo.etiqueta}")
-
-class NodoVista:
     def __init__(self, etiqueta, hijos=None):
         self.etiqueta = etiqueta
-        self.hijos = hijos if hijos is not None else []
+        self.hijos = hijos or []
 
-def ast_a_vista(nodo):
-    if nodo is None:
-        return None
-    etiqueta = nodo.etiqueta
-    if etiqueta in ('E','T','F'):
-        lista_hijos = []
-        for c in nodo.hijos:
-            if c.etiqueta in ('opsuma','opmul'):
-                lista_hijos.append(NodoVista(c.etiqueta)) # sin el signo debajo
-            elif c.etiqueta in ('num','id','pari','pard'):
-                if c.valor is not None:
-                    lista_hijos.append(NodoVista(c.etiqueta, [NodoVista(str(c.valor))]))
-                else:
-                    lista_hijos.append(NodoVista(c.etiqueta))
-            else:
-                lista_hijos.append(ast_a_vista(c))
-        return NodoVista(etiqueta, lista_hijos)
-    if etiqueta in ('opsuma','opmul'):
-        return NodoVista(etiqueta)
-    if etiqueta in ('num','id','pari','pard'):
-        if nodo.valor is not None:
-            return NodoVista(etiqueta, [NodoVista(str(nodo.valor))])
-        return NodoVista(etiqueta)
-    return NodoVista(etiqueta, [ast_a_vista(h) for h in nodo.hijos])
+def analizar(gramatica, tokens, simbolo_inicial="E"):
+    pos = [0]  
 
-def dibujar_caja(nodo_vista):
-    etiqueta = nodo_vista.etiqueta
-    ancho_interno = len(etiqueta)
-    ancho = ancho_interno + 2
-    linea_sup = "┌" + "─"*ancho + "┐"
-    linea_mid = "│" + etiqueta.center(ancho) + "│"
-    linea_inf = "└" + "─"*ancho + "┘"
-    bloque = [linea_sup, linea_mid, linea_inf]
-    ancho_bloque = len(linea_sup)
-    if not nodo_vista.hijos:
-        return bloque, ancho_bloque, ancho_bloque//2
+    def ver():
+        if pos[0] < len(tokens):
+            return tokens[pos[0]]
+        return (None, None)
 
-    render_hijos = [dibujar_caja(h) for h in nodo_vista.hijos]
-    lineas_hijos = [r[0] for r in render_hijos]
-    anchos_hijos = [r[1] for r in render_hijos]
-    centros_hijos = [r[2] for r in render_hijos]
+    def consumir(tipo_esperado=None):
+        tok = ver()
+        if tipo_esperado and tok[0] != tipo_esperado:
+            raise SyntaxError(f"Se esperaba {tipo_esperado}, se encontro {tok}")
+        if pos[0] < len(tokens):
+            pos[0] += 1
+            return tok
+        return (None, None)
 
-    separacion = 2
-    total_hijos = sum(anchos_hijos) + separacion*(len(anchos_hijos)-1)
-    ancho_total = max(total_hijos, ancho_bloque)
-    extra = ancho_total - total_hijos
-    cur = extra//2
-    comienzos = []
-    for w in anchos_hijos:
-        comienzos.append(cur)
-        cur += w + separacion
-
-    padre_start = (ancho_total - ancho_bloque)//2
-    padre_centro = padre_start + ancho_bloque//2
-
-    canvas = []
-    for l in bloque:
-        linea = [' ']*ancho_total
-        for i,ch in enumerate(l):
-            p = padre_start + i
-            if 0 <= p < ancho_total:
-                linea[p] = ch
-        canvas.append(''.join(linea).rstrip())
-
-    linea_v = [' ']*ancho_total
-    linea_v[padre_centro] = '│'
-    canvas.append(''.join(linea_v).rstrip())
-
-    linea_r = [' ']*ancho_total
-    linea_r[padre_centro] = '┴'
-    for s,w,m in zip(comienzos, anchos_hijos, centros_hijos):
-        centro_hijo = s + m
-        if centro_hijo == padre_centro:
-            linea_r[centro_hijo] = '│'
+    def parse_F():
+        tok = ver()
+        if tok[0] == "num":
+            consumir("num")
+            return Nodo("F", [Nodo("num", [Nodo(tok[1])])])
+        elif tok[0] == "id":
+            consumir("id")
+            return Nodo("F", [Nodo("id", [Nodo(tok[1])])])
+        elif tok[0] == "pari":
+            pari_tok = consumir("pari")  
+            interno = parse_E()
+            if interno is None:
+                raise SyntaxError("Expresión invalida después de '('")
+            if ver()[0] != "pard":
+                raise SyntaxError("Falta ')'")
+            pard_tok = consumir("pard")  
+            return Nodo("F", [
+                Nodo("pari", [Nodo(pari_tok[1])]),
+                interno,
+                Nodo("pard", [Nodo(pard_tok[1])])
+            ])
         else:
-            lo = min(centro_hijo, padre_centro)
-            hi = max(centro_hijo, padre_centro)
-            for k in range(lo+1, hi):
-                linea_r[k] = '─'
-            linea_r[centro_hijo] = '┴'
-            linea_r[padre_centro] = '┴'
-    canvas.append(''.join(linea_r).rstrip())
+            raise SyntaxError(f"Se esperaba F (num/id/(E)), se encontro {tok}")
 
-    altura_max = max(len(lines) for lines in lineas_hijos)
-    hijos_padded = []
-    for lines,w in zip(lineas_hijos, anchos_hijos):
-        padded = lines + [' '*w]*(altura_max - len(lines))
-        hijos_padded.append(padded)
+    def parse_T():
+        nodo = parse_F()
+        if nodo is None:
+            return None
+        while ver()[0] == "opmul":
+            op = consumir("opmul")
+            derecho = parse_F()
+            if derecho is None:
+                raise SyntaxError("Se esperaba F despues de operador * o /")
+            nodo = Nodo("T", [nodo, Nodo("opmul", [Nodo(op[1])]), derecho])
+        if nodo.etiqueta != "T":
+            return Nodo("T", [nodo])
+        return nodo
 
-    for fila in range(altura_max):
-        linea = [' ']*ancho_total
-        for inicio, block, w in zip(comienzos, hijos_padded, anchos_hijos):
-            seg = block[fila]
-            for i,ch in enumerate(seg):
-                p = inicio + i
-                if 0 <= p < ancho_total:
-                    linea[p] = ch
-        canvas.append(''.join(linea).rstrip())
+    def parse_E():
+        nodo = parse_T()
+        if nodo is None:
+            return None
+        while ver()[0] == "opsuma":
+            op = consumir("opsuma")
+            derecho = parse_T()
+            if derecho is None:
+                raise SyntaxError("Se esperaba T despues de operador + o -")
+            nodo = Nodo("E", [nodo, Nodo("opsuma", [Nodo(op[1])]), derecho])
+        if nodo.etiqueta != "E":
+            return Nodo("E", [nodo])
+        return nodo
 
-    return canvas, ancho_total, padre_centro
-
-def imprimir_arbol(nodo_vista):
-    lineas, _, _ = dibujar_caja(nodo_vista)
-    for l in lineas:
-        print(l)
-
-def main():
     try:
-        expr = input("Ingresa una operación: ").strip()
-        if not expr:
-            print("No ingresaste nada.")
-            return
-        tok = list(lexear(expr)) 
-        p = Parser(tok)          
-        arbol = p.parse()        
-        valores = {}             
-        try:
-            resultado = evaluar(arbol, valores) 
-            if abs(resultado - int(resultado)) < 1e-12:
-                resultado = int(resultado)
-            print("Resultado:", resultado)
-        except ZeroDivisionError:
-            print("Error: división por cero.")
-            return
-        vista = ast_a_vista(arbol)   
-        print("\nÁrbol sintáctico:")
-        imprimir_arbol(vista)        
-    except SyntaxError as e:
-        print("Error de sintaxis:", e)
-    except Exception as e:
-        print("Ocurrió un error:", e)
+        raiz = parse_E()
+        if raiz is None:
+            return None
+        if pos[0] != len(tokens):
+            return None
+        if isinstance(raiz, Nodo) and raiz.etiqueta == simbolo_inicial:
+            return raiz
+        return raiz
+    except SyntaxError:
+        return None
+
+def construir_grafo(G, nodo, padre=None, contador=None, mapping=None):
+    if contador is None:
+        contador = {"v": 0}
+    if mapping is None:
+        mapping = {}
+    idx = contador["v"]
+    contador["v"] += 1
+    nombre = f"{nodo.etiqueta}_{idx}"
+    G.add_node(nombre, label=nodo.etiqueta)
+    mapping[id(nodo)] = nombre
+    if padre:
+        G.add_edge(padre, nombre)
+    for hijo in nodo.hijos:
+        construir_grafo(G, hijo, nombre, contador, mapping)
+    return G, mapping
+
+def posiciones_arbol(raiz, mapping, espacio_x=1.0, espacio_y=1.5):
+    posiciones = {}
+    def asignar(nodo, profundidad, x_actual):
+        nombre_nodo = mapping[id(nodo)]
+        if not nodo.hijos:
+            x = x_actual[0]
+            posiciones[nombre_nodo] = (x, -profundidad * espacio_y)
+            x_actual[0] += espacio_x
+            return posiciones[nombre_nodo][0]
+        primero = None
+        ultimo = None
+        for c in nodo.hijos:
+            x_hijo = asignar(c, profundidad + 1, x_actual)
+            if primero is None:
+                primero = x_hijo
+            ultimo = x_hijo
+        centro_x = (primero + ultimo) / 2.0
+        posiciones[nombre_nodo] = (centro_x, -profundidad * espacio_y)
+        return centro_x
+    asignar(raiz, 0, [0.0])
+    return posiciones
+
+def normalizar_arbol(nodo):
+    if not nodo.hijos:
+        return Nodo(nodo.etiqueta, [Nodo(h.etiqueta) for h in nodo.hijos]) if nodo.hijos else Nodo(nodo.etiqueta, list(nodo.hijos))
+
+    hijos_norm = [normalizar_arbol(c) for c in nodo.hijos]
+
+    nuevo_nodo = Nodo(nodo.etiqueta, hijos_norm)
+
+    if nuevo_nodo.etiqueta == "E":
+        while len(nuevo_nodo.hijos) >= 3 and nuevo_nodo.hijos[1].etiqueta == "opsuma" and nuevo_nodo.hijos[0].etiqueta != "E":
+            izq = nuevo_nodo.hijos[0]
+            izq_envuelto = Nodo("E", [izq])
+            nuevos_hijos = [izq_envuelto] + nuevo_nodo.hijos[1:]
+            nuevo_nodo = Nodo("E", nuevos_hijos)
+        return nuevo_nodo
+
+    if nuevo_nodo.etiqueta == "T":
+        while len(nuevo_nodo.hijos) >= 3 and nuevo_nodo.hijos[1].etiqueta == "opmul" and nuevo_nodo.hijos[0].etiqueta != "T":
+            izq = nuevo_nodo.hijos[0]
+            izq_envuelto = Nodo("T", [izq])
+            nuevos_hijos = [izq_envuelto] + nuevo_nodo.hijos[1:]
+            nuevo_nodo = Nodo("T", nuevos_hijos)
+        return nuevo_nodo
+    return nuevo_nodo
+
+def dibujar_arbol(nodo):
+    G = nx.DiGraph()
+    nodo_norm = normalizar_arbol(nodo)
+    G, mapping = construir_grafo(G, nodo_norm)
+    pos = posiciones_arbol(nodo_norm, mapping)
+    etiquetas = nx.get_node_attributes(G, 'label')
+    plt.figure(figsize=(12, 6))
+    nx.draw(G, pos, with_labels=True, labels=etiquetas,
+            node_size=1200, node_color="lightblue",
+            font_size=9, font_weight="bold", arrows=False)
+    plt.axis('off')
+    plt.savefig("arbol_sintactico.png", dpi=300)
+    print(" El arbol sintáctico se guardo como 'arbol_sintactico.png'")
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) != 3:
+        print("Uso: python3 Calculadora.py gramatica.txt \"2+3-4\"")
+        sys.exit(1)
+
+    archivo_gram = sys.argv[1]
+    expresion = sys.argv[2]
+
+    gramatica = cargar_gramatica(archivo_gram)
+    tokens = tokenizar(expresion)
+
+    arbol = analizar(gramatica, tokens, "E")
+
+    if arbol:
+        print("Cadena valida. arbol de sintaxis generado.")
+        dibujar_arbol(arbol)
+    else:
+        print("Cadena invalida.")
